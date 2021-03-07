@@ -23,6 +23,16 @@ def convert_dict_to_df(movie_dict):
     return pd.DataFrame.from_dict(new_movies)
 
 
+def users_dict_to_df(users_dict):
+    # format in a pandas read-able way
+    new_users = {"userId": [], "ratings": []}
+    for user_id in users_dict:
+        new_users["userId"].append(user_id)
+        new_users["ratings"].append(users_dict[user_id])
+
+    return pd.DataFrame.from_dict(new_users)
+
+
 def merge_movies_and_tags(movies, movie_tags):
     df = movies.merge(movie_tags, on="movieId", how="left")
     df = df.to_dict()
