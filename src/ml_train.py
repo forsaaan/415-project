@@ -1,6 +1,8 @@
 from src.test_data import *
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 
 LOCAL_FOLDER = Path(__file__).resolve().parent
 
@@ -25,9 +27,17 @@ def get_train_test_data(user_id, movie_id, num_similar, folder_name, train_size)
     return train_features, train_target, test_features, test_target
 
 
-def train_model():
+def train_model(train_features, train_target):
+    train_features[0] = train_features[0] + train_features[1]
+    train_features[0] = train_features[0].apply(np.array)
+    train_features = train_features[0].to_numpy()
+    cv_errors = -cross_val_score(RandomForestRegressor(), list(train_features), train_target,
+                                 scoring="neg_root_mean_squared_error", cv=10)
+    return cv_errors
+
 
 if __name__ == "__main__":
     a, b, c, d = get_train_test_data(1, 1, 3, 'data', .9)
-    print(a)
-
+    # print(a)
+    # print(b)
+    print(train_model(a, b))
