@@ -2,7 +2,7 @@ from src.test_data import *
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+import statistics as stat
 
 LOCAL_FOLDER = Path(__file__).resolve().parent
 
@@ -28,12 +28,19 @@ def get_train_test_data(user_id, movie_id, num_similar, folder_name, train_size)
 
 
 def train_model(train_features, train_target):
+    def standardized_scores(score_list):
+        standardized = (score_list - stat.mean(score_list)) / stat.stdev(score_list)
+        return standardized
+
+    train_features[0] = train_features[0].apply(standardized_scores)
     train_features[0] = train_features[0] + train_features[1]
     train_features[0] = train_features[0].apply(np.array)
     train_features = train_features[0].to_numpy()
-    cv_errors = -cross_val_score(RandomForestRegressor(), list(train_features), train_target,
+
+    cv_errors = -cross_val_score(RandomForestRegressor(max_depth=5, n_estimators=100, max_features='sqrt'),
+                                 list(train_features), train_target,
                                  scoring="neg_root_mean_squared_error", cv=10)
-    return cv_errors
+    return cv_errors.mean()
 
 
 if __name__ == "__main__":
