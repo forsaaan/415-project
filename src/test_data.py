@@ -3,16 +3,18 @@ from src.find_corr import *
 LOCAL_FOLDER = Path(__file__).resolve().parent
 
 
-def get_avg_genre_ratings(user_id, users, num_similar, folder_name):
+def get_avg_genre_ratings(user_id, movie_id, similar_users, ratings, folder_name):
     def split_genres(string):
         return string.split("|")
 
     def avg_ratings(user_id, ratings):
         ratings = ratings[ratings['userId'] == user_id]
-        ratings = ratings.merge(movies, on='movieId')
-        ratings = ratings.drop(columns=['movieId', 'timestamp', 'title'])
+        ratings = ratings.drop(columns=['timestamp', 'title'])
         ratings['genres'] = ratings['genres'].apply(split_genres)
         ratings_long = ratings.copy()
+        ratings = ratings.drop(columns='movieId')
+        ratings_long = ratings_long[ratings_long['movieId'] != movie_id]
+        ratings_long = ratings_long.drop(columns='movieId')
         ratings_long['genres'] = ratings_long['genres'].explode('genres')
         user_ratings = ratings_long.groupby(['userId', 'genres']).mean().reset_index()
 
@@ -34,22 +36,32 @@ def get_avg_genre_ratings(user_id, users, num_similar, folder_name):
 
     folder_path = LOCAL_FOLDER.joinpath(folder_name)
     movies = pd.read_csv(folder_path.joinpath("movies.csv"))
-    ratings = pd.read_csv(folder_path.joinpath("ratings.csv"))
     genres = movies['genres'].apply(split_genres).explode('genres').unique().tolist()
 
     user_data = avg_ratings(user_id, ratings)
     user_data = get_movie_genres(user_data)
 
-    similar_users = find_corr_users(user_id, users, num_similar)
-
-    for k in range(num_similar):
+    for k in range(len(similar_users)):
         similar_data = avg_ratings(similar_users[k], ratings)
         user_data.extend(get_movie_genres(similar_data))
     return pd.DataFrame(user_data)
 
 
+def get_user_reviews(user_id, similar_users, ratings):
+    def user_reviews(user_id, ratings):
+        user_ratings = ratings[ratings['userId'] == user_id]
+        user_ratings = user_ratings['rating'].tolist()
+        return user_ratings
+
+    reviews = user_reviews(user_id, ratings)
+    for user in similar_users:
+        reviews.extend(user_reviews(user, ratings))
+    return reviews
+
+
 if __name__ == "__main__":
     movies, users = load_movies_and_users("data")
-    sim = find_corr_users(1, users, 5)
-    test_data = get_avg_genre_ratings(1, users, 3, 'data')
+    test_data = get_avg_genre_ratings(1, 1, 3, 'data')
+    test_ratings = get_user_reviews(1, find_corr_users(1, users, 3), 'data')
     print(test_data)
+    print(len(test_ratings))
