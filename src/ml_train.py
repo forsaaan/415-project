@@ -1,50 +1,66 @@
-from src.test_data import *
-from sklearn.model_selection import train_test_split
+from pathlib import Path
+import pickle
+
+import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_val_score
-import statistics as stat
+from src.find_corr import load_movies_and_users, find_corr_movie
+from src.ml_helper import get_user_stats, get_favorite_movie, genre_indices
 
 LOCAL_FOLDER = Path(__file__).resolve().parent
 
 
-def get_train_test_data(user_id, movie_id, num_similar, folder_name, train_size):
-    folder_path = LOCAL_FOLDER.joinpath(folder_name)
-
-    movies = pd.read_csv(folder_path.joinpath("movies.csv"))
-    ratings = pd.read_csv(folder_path.joinpath("ratings.csv"))
-    ratings = ratings.merge(movies, on='movieId')
-    ratings_train, ratings_test = train_test_split(ratings, train_size=train_size)
-
-    movie_info, user_ratings = load_movies_and_users(folder_name)
-    similar_users = find_corr_users(user_id, user_ratings, num_similar)
-
-    train_features = get_avg_genre_ratings(user_id, movie_id, similar_users, ratings_train, folder_name)
-    train_target = get_user_reviews(user_id, similar_users, ratings_train)
-
-    test_features = get_avg_genre_ratings(user_id, movie_id, similar_users, ratings_test, folder_name)
-    test_target = get_user_reviews(user_id, similar_users, ratings_test)
-
-    return train_features, train_target, test_features, test_target
+def standardized_scores(score_lists):
+    temp = []
+    for score_list in score_lists:
+        np_list = np.array(score_list[:20])
+        standardized = (np_list - np_list.mean()) / np_list.std()
+        temp.append(standardized.tolist() + score_list[20:])
+    return temp
 
 
-def train_model(train_features, train_target):
-    def standardized_scores(score_list):
-        standardized = (score_list - stat.mean(score_list)) / stat.stdev(score_list)
-        return standardized
+def train_model(inputs, target, max_depth, estimators):
+    model = RandomForestRegressor(max_depth=max_depth, n_estimators=estimators, max_features='sqrt')
+    cv_scores = cross_val_score(
+        model,
+        inputs,
+        target,
+        cv=5
+    )
+    model.fit(inputs, target)
+    print("CV score:", cv_scores.mean())
 
-    train_features[0] = train_features[0].apply(standardized_scores)
-    train_features[0] = train_features[0] + train_features[1]
-    train_features[0] = train_features[0].apply(np.array)
-    train_features = train_features[0].to_numpy()
+    return model
 
-    cv_errors = -cross_val_score(RandomForestRegressor(max_depth=5, n_estimators=100, max_features='sqrt'),
-                                 list(train_features), train_target,
-                                 scoring="neg_root_mean_squared_error", cv=10)
-    return cv_errors.mean()
+
+def test_model(model, inputs, target):
+    return model.score(inputs, target)
+
+
+def suggest_to_user(user_id, folder_name="data"):
+    movies, users, movie_id_map, id_movie_map = load_movies_and_users(folder_name, ids=True)
+    user_stats = get_user_stats(user_id, users, movies, id_movie_map)
+    with open(LOCAL_FOLDER.joinpath("best_model.pkl"), "rb") as f:
+        best_clf = pickle.load(f)
+    favorite_movie_id, seen = get_favorite_movie(user_id, users, id_movie_map)
+    suggestions = find_corr_movie(favorite_movie_id, movies, 10)
+
+    best_pred_score = 0
+    best_movie = suggestions[0]
+    for suggestion in suggestions:
+        movie_ids = [0] * len(list(genre_indices.keys()))
+        for genre in movies[suggestion]["genres"]:
+            movie_ids[genre_indices[genre]] = 1
+        if suggestion not in seen:
+            pred_score = best_clf.predict([user_stats + movie_ids])
+            if pred_score > best_pred_score:
+                best_pred_score = pred_score
+                best_movie = best_movie
+
+    return best_pred_score[0], movies[best_movie]
 
 
 if __name__ == "__main__":
-    a, b, c, d = get_train_test_data(1, 1, 3, 'data', .9)
-    # print(a)
-    # print(b)
-    print(train_model(a, b))
+    user_id = 1
+    score, movie = suggest_to_user(user_id=user_id)
+    print("User ID:", user_id, "\nMovie:", movie, "\nPredicted score: %.2f" % score)
