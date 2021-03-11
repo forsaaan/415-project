@@ -57,7 +57,7 @@ def process_users(users, num_movies, movie_id_map):
     return new_users
 
 
-def load_movies_and_users(folder_name):
+def load_movies_and_users(folder_name, ids=False):
     def split_genres(string):
         return string.split("|")
 
@@ -73,8 +73,10 @@ def load_movies_and_users(folder_name):
 
     # this is because movie ids are not a sequence
     movie_id_map = {}
+    id_movie_map = {}
     for i, movie_id in enumerate(movies["movieId"]):
         movie_id_map[movie_id] = i
+        id_movie_map[i] = movie_id
 
     movies["genres"] = movies["genres"].str.lower().apply(split_genres)
     movies = merge_movies_and_tags(movies, movie_tags)
@@ -83,6 +85,8 @@ def load_movies_and_users(folder_name):
     users = pd.read_csv(folder_path.joinpath("ratings.csv"))
     users = process_users(users, len(movies.keys()), movie_id_map)
 
+    if ids:
+        return movies, users, movie_id_map, id_movie_map
     return movies, users
 
 
