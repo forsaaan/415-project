@@ -1,5 +1,4 @@
 from pathlib import Path
-import pickle
 
 import optuna
 from src.ml_train import train_model, test_model
@@ -21,9 +20,6 @@ class Objective(object):
         model = train_model(self.tr_i, self.tr_t, max_depth, estimators)
         score = test_model(model, self.te_i, self.te_t)
 
-        with open(LOCAL_FOLDER.joinpath("models/{}.pkl".format(trial.number)), "wb") as f:
-            pickle.dump(model, f)
-
         return score
 
 
@@ -33,9 +29,6 @@ if __name__ == "__main__":
 
     study = optuna.create_study(direction='maximize')
     study.optimize(obj, n_trials=10)
-    # user_id = 1
-    # score, movie = suggest_to_user(study, user_id=user_id)
-    # print("User ID:", user_id, "\nMovie:", movie, "\nPredicted score: %.2f" % score)
     fig = optuna.visualization.plot_contour(study, params=["max_depth", "estimators"])
     fig.show()
     study.optimize(obj, n_trials=10)

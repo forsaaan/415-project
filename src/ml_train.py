@@ -37,10 +37,10 @@ def test_model(model, inputs, target):
     return model.score(inputs, target)
 
 
-def suggest_to_user(study, user_id, folder_name="data"):
+def suggest_to_user(user_id, folder_name="data"):
     movies, users, movie_id_map, id_movie_map = load_movies_and_users(folder_name, ids=True)
     user_stats = get_user_stats(user_id, users, movies, id_movie_map)
-    with open(LOCAL_FOLDER.joinpath("models/{}.pkl".format(study.best_trial.number)), "rb") as f:
+    with open(LOCAL_FOLDER.joinpath("best_model.pkl"), "rb") as f:
         best_clf = pickle.load(f)
     favorite_movie_id, seen = get_favorite_movie(user_id, users, id_movie_map)
     suggestions = find_corr_movie(favorite_movie_id, movies, 10)
@@ -58,3 +58,9 @@ def suggest_to_user(study, user_id, folder_name="data"):
                 best_movie = best_movie
 
     return best_pred_score[0], movies[best_movie]
+
+
+if __name__ == "__main__":
+    user_id = 1
+    score, movie = suggest_to_user(user_id=user_id)
+    print("User ID:", user_id, "\nMovie:", movie, "\nPredicted score: %.2f" % score)
